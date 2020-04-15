@@ -53,7 +53,7 @@ static inline void EUID_PRINT(void) {
 
 static inline void EUID_INIT(void) {
 	firejail_uid = getuid();
-	firejail_gid = getgid();
+	firejail_gid = getegid();
 }
 
 #endif
