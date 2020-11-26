@@ -240,6 +240,13 @@ char *expand_macros(const char *path) {
 			EUID_ROOT();
 		return new_name;
 	}
+	else if (strncmp(path, "${PRIVILEGED}", 13) == 0) {
+		if (asprintf(&new_name, "%s/.local/share/system/privileged%s", cfg.homedir, path + 13) == -1)
+			errExit("asprintf");
+		if (called_as_root)
+			EUID_ROOT();
+		return new_name;
+	}
 	else {
 		char *directory = resolve_macro(path);
 		if (directory) {
@@ -295,6 +302,8 @@ void invalid_filename(const char *fname, int globbing) {
 		ptr = fname + 7;
 	else if (strncmp(ptr, "${RUNUSER}", 10) == 0)
 		ptr = fname + 10;
+	else if (strncmp(ptr, "${PRIVILEGED}", 13) == 0)
+		ptr = fname + 13;
 	else {
 		int id = macro_id(fname);
 		if (id != -1)

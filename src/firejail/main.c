@@ -53,8 +53,7 @@ int __clone2(int (*fn)(void *),
               /* pid_t *ptid, struct user_desc *tls, pid_t *ctid */ );
 #endif
 
-uid_t firejail_uid = 0;
-gid_t firejail_gid = 0;
+euid_data_t euid_data = EUID_DATA_INIT;
 
 #define STACK_SIZE (1024 * 1024)
 #define STACK_ALIGNMENT 16
@@ -982,7 +981,7 @@ int main(int argc, char **argv, char **envp) {
 	fix_std_streams();
 
 	// drop permissions by default and rise them when required
-	EUID_INIT();
+	EUID_INIT(*argv);
 	EUID_USER();
 
 	// argument count should be larger than 0
@@ -1964,6 +1963,12 @@ int main(int argc, char **argv, char **envp) {
 			} else
 				cfg.opt_private_keep = argv[i] + 14;
 			arg_private_opt = 1;
+		}
+		else if (strncmp(argv[i], "--privileged-data=", 18) == 0) {
+			const char *arg = argv[i] + 18;
+			profile_list_augment(&cfg.privileged_data_keep, arg);
+			if (arg_debug)
+				fprintf(stderr, "[option] combined privileged-data list: \"%s\"\n", cfg.privileged_data_keep);
 		}
 		else if (strncmp(argv[i], "--private-srv=", 14) == 0) {
 			// extract private srv list
@@ -3011,71 +3016,76 @@ int main(int argc, char **argv, char **envp) {
 
  	if (arg_noroot) {
 	 	// update the UID and GID maps in the new child user namespace
-		// uid
-	 	char *map_path;
-	 	if (asprintf(&map_path, "/proc/%d/uid_map", child) == -1)
-	 		errExit("asprintf");
+		/* NB: In Linux 4.14 and earlier, id mapping data can have at
+		 *     maximum 5 lines - see user_namespaces (7) for details. */
+		const int id_max = 5;
+		int id_data[id_max];
+		int id_cnt = 0;
+		char *map_path = 0;
+		char map_data[1024];
 
-	 	char *map;
-	 	uid_t uid = getuid();
-	 	if (asprintf(&map, "%d %d 1", uid, uid) == -1)
+		auto void id_add(int id) {
+			if (id != -1) {
+				for (int i = 0; ; ++i) {
+					if (i == id_max) {
+						fprintf(stderr, "%s: skip id: %d (overflow)\n", map_path, id);
+						break;
+					}
+					if (i == id_cnt) {
+						id_data[id_cnt++] = id;
+						break;
+					}
+					if (id_data[i] == id)
+						break;
+				}
+			}
+		}
+
+		auto char *id_map(void) {
+			char *ptr = map_data;
+			for (int i = 0; i < id_cnt; ++i) {
+				sprintf(ptr, "%d %d 1\n", id_data[i], id_data[i]);
+				ptr += strlen(ptr);
+			}
+			*ptr = 0;
+			id_cnt = 0;
+			return map_data;
+		}
+
+		// UIDs
+		if (asprintf(&map_path, "/proc/%d/uid_map", child) == -1)
 	 		errExit("asprintf");
- 		EUID_ROOT();
-	 	update_map(map, map_path);
+		id_add(0);
+		id_add(euid_data.uid);
+		id_add(euid_data.privileged_uid);
+		EUID_ROOT();
+		update_map(id_map(), map_path);
 	 	EUID_USER();
-	 	free(map);
 	 	free(map_path);
 
-	 	// gid file
+		// GIDs
 		if (asprintf(&map_path, "/proc/%d/gid_map", child) == -1)
 			errExit("asprintf");
-	 	char gidmap[1024];
-	 	char *ptr = gidmap;
-	 	*ptr = '\0';
 
-	 	// add user group
-	 	gid_t gid = getgid();
-	 	sprintf(ptr, "%d %d 1\n", gid, gid);
-	 	ptr += strlen(ptr);
-
+		id_add(0);
+		id_add(euid_data.gid);
+		id_add(euid_data.primary_gid);
+		id_add(euid_data.privileged_gid);
 	 	if (!arg_nogroups) {
 		 	//  add firejail group
-		 	gid_t g = get_group_id("firejail");
-		 	if (g) {
-		 		sprintf(ptr, "%d %d 1\n", g, g);
-		 		ptr += strlen(ptr);
-		 	}
-
+			id_add(get_group_id("firejail"));
 		 	//  add tty group
-		 	g = get_group_id("tty");
-		 	if (g) {
-		 		sprintf(ptr, "%d %d 1\n", g, g);
-		 		ptr += strlen(ptr);
-		 	}
-
+			id_add(get_group_id("tty"));
 		 	//  add audio group
-		 	g = get_group_id("audio");
-		 	if (g) {
-		 		sprintf(ptr, "%d %d 1\n", g, g);
-		 		ptr += strlen(ptr);
-		 	}
-
+			id_add(get_group_id("audio"));
 		 	//  add video group
-		 	g = get_group_id("video");
-		 	if (g) {
-		 		sprintf(ptr, "%d %d 1\n", g, g);
-		 		ptr += strlen(ptr);
-		 	}
-
+			id_add(get_group_id("video"));
 		 	//  add games group
-		 	g = get_group_id("games");
-		 	if (g) {
-		 		sprintf(ptr, "%d %d 1\n", g, g);
-		 	}
+			id_add(get_group_id("games"));
 		 }
 
  		EUID_ROOT();
-	 	update_map(gidmap, map_path);
+		update_map(id_map(), map_path);
 	 	EUID_USER();
 	 	free(map_path);
  	}

@@ -862,6 +862,82 @@ int sandbox(void* sandbox_arg) {
 	if (arg_private_dev)
 		fs_private_dev();
 
+	if (cfg.privileged_data_keep) {
+		struct stat st = {};
+		char *private_dir = 0;
+		if (asprintf(&private_dir, "%s/.local/share/system/privileged", cfg.homedir) < 0)
+			errExit("asprintf");
+
+		if (cfg.chrootdir) {
+			fwarning("privileged-data feature is disabled in chroot\n");
+		}
+		else if (arg_overlay) {
+			fwarning("privileged-data feature is disabled in overlay\n");
+		}
+		else if (euid_data.privileged_uid == INVALID_UID || euid_data.privileged_gid == INVALID_GID) {
+			fwarning("privileged-data feature is disabled - no \"privileged\" user\n");
+		}
+		else if (lstat(private_dir, &st) == -1) {
+			// config files should use mkdir to ensure the directory exist
+			fwarning("privileged-data feature is disabled - \"%s\" access: %m\n", private_dir);
+		}
+		else if (!S_ISDIR(st.st_mode)) {
+			fwarning("privileged-data feature is disabled - \"%s\" is not a dir\n", private_dir);
+		}
+		else if (chown(private_dir, euid_data.privileged_uid, euid_data.privileged_gid) == -1) {
+			fwarning("privileged-data feature is disabled - \"%s\" chown: %m\n", private_dir);
+		}
+		else {
+			/* Create empty privileged data dir */
+			if (1||arg_debug)
+				fprintf(stderr, "constructing %s: %s ...\n", RUN_PRIVILEGED_DIR, cfg.privileged_data_keep);
+			mkdir_attr(RUN_PRIVILEGED_DIR, 0770, euid_data.privileged_uid, euid_data.privileged_gid);
+			selinux_relabel_path(RUN_PRIVILEGED_DIR, private_dir);
+
+			/* Mount specified subdirectories */
+			char *work = strdup(cfg.privileged_data_keep);
+			char *pos = work;
+			char *ent;
+			while (*(ent = profile_list_slice(pos, &pos))) {
+				char *srce = 0;
+				if (asprintf(&srce, "%s/%s", private_dir, ent) < 0)
+					errExit("asprintf");
+				char *dest = 0;
+				if (asprintf(&dest, "%s/%s", RUN_PRIVILEGED_DIR, ent) < 0)
+					errExit("asprintf");
+				struct stat st = {};
+				if (lstat(srce, &st) == -1)
+					fprintf(stderr, "%s: could not stat: %m\n", srce);
+				else if (!S_ISDIR(st.st_mode))
+					fprintf(stderr, "%s: is not a directory\n", srce);
+				else if (mkdir(dest, st.st_mode & 0777) == -1)
+					fprintf(stderr, "%s: could not create: %m\n", dest);
+				else if (chown(dest, st.st_uid, st.st_gid) == -1)
+					fprintf(stderr, "%s: could not chown: %m\n", dest);
+				else if (mount(srce, dest, 0, MS_BIND, 0) < 0)
+					fprintf(stderr, "%s: could not mount: %m\n", srce);
+				else if (arg_debug)
+					fprintf(stderr, "%s: mounted at: %s\n", srce, dest);
+				free(dest);
+				free(srce);
+			}
+			free(work);
+
+			/* Mount constructed private data dir on top of the real thing */
+			if (1||arg_debug)
+				fprintf(stderr, "mounting %s @ %s\n", RUN_PRIVILEGED_DIR, private_dir);
+			if (mount(RUN_PRIVILEGED_DIR, private_dir, NULL, MS_BIND|MS_REC, NULL) < 0)
+				errExit("mount bind");
+
+			/* Then hide the construction site */
+			if (1||arg_debug)
+				fprintf(stderr, "hiding %s\n", RUN_PRIVILEGED_DIR);
+			if (mount("tmpfs", RUN_PRIVILEGED_DIR, "tmpfs", MS_NOSUID | MS_NODEV | MS_STRICTATIME, "mode=755,gid=0") < 0)
+				errExit("mounting tmpfs");
+		}
+		free(private_dir);
+	}
+
 	if (arg_private_opt) {
 		if (cfg.chrootdir)
 			fwarning("private-opt feature is disabled in chroot\n");

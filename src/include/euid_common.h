@@ -24,36 +24,84 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <assert.h>
+#include <pwd.h>
+
+/* Sailfish OS uses privileged user/group file ownership
+ * to limit access to data with privacy implications and
+ * this must be taken into account during sandbox setup.
+ *
+ * If such user/group does not exist, all features related
+ * to privileged data should be automatically disabled.
+ */
+#define PRIVILEGED_USER  "privileged"
+#define PRIVILEGED_GROUP "privileged"
+
+#define INVALID_UID ((uid_t)(-1))
+#define INVALID_GID ((gid_t)(-1))
 
 #define EUID_ASSERT() { \
 	if (getuid() != 0) \
 		assert(geteuid() != 0); \
 }
 
-extern uid_t firejail_uid;
-extern uid_t firejail_gid;
+typedef struct {
+  uid_t uid;
+  gid_t gid;
+  gid_t primary_gid;
+  gid_t privileged_gid;
+  uid_t privileged_uid;
+} euid_data_t;
 
-static inline void EUID_ROOT(void) {
-	int rv = seteuid(0);
-	rv |= setegid(0);
-	(void) rv;
+#define EUID_DATA_INIT  {\
+    .uid            = 0,\
+    .gid            = 0,\
+    .primary_gid    = INVALID_GID,\
+    .privileged_gid = INVALID_GID,\
+    .privileged_uid = INVALID_UID,\
 }
+extern euid_data_t euid_data;
+extern int arg_debug;
 
-static inline void EUID_USER(void) {
-	if (seteuid(firejail_uid) == -1)
-		errExit("seteuid");
-	if (setegid(firejail_gid) == -1)
-		errExit("setegid");
-}
+/* Implement as macros so that error reporting refers
+ * to call site instead of this header file ... */
+#define EUID_ROOT() do {\
+	if (seteuid(0) == -1)\
+		errExit("EUID_ROOT:seteuid(root)");\
+	if (setegid(0) == -1)\
+		errExit("EUID_ROOT:setegid(root)");\
+} while (0)
 
-static inline void EUID_PRINT(void) {
-	printf("debug: uid %d, euid %d\n", getuid(), geteuid());
-	printf("debug: gid %d, egid %d\n", getgid(), getegid());
-}
+#define EUID_USER() do {\
+	if (seteuid(euid_data.uid) == -1)\
+		errExit("EUID_USER:seteuid(user)");\
+	if (setegid(euid_data.gid) == -1)\
+		errExit("EUID_USER:setegid(user)");\
+} while (0)
 
-static inline void EUID_INIT(void) {
-	firejail_uid = getuid();
-	firejail_gid = getegid();
+static inline void EUID_INIT(const char *progname) {
+	struct passwd *pw;
+
+	euid_data.uid = getuid();
+	euid_data.gid = getegid();
+
+	if ((pw = getpwuid(euid_data.uid))) {
+		if (euid_data.gid != pw->pw_gid)
+			euid_data.primary_gid = pw->pw_gid;
+	}
+
+	if ((pw = getpwnam(PRIVILEGED_USER))) {
+		euid_data.privileged_uid = pw->pw_uid;
+		euid_data.privileged_gid = pw->pw_gid;
+	}
+	if (arg_debug) {
+		fprintf(stderr, "%s: uid=%d gid=%d primary_gid=%d privileged_uid=%d privileged_gid=%d\n",
+			progname,
+			(int)euid_data.uid,
+			(int)euid_data.gid,
+			(int)euid_data.primary_gid,
+			(int)euid_data.privileged_uid,
+			(int)euid_data.privileged_gid);
+	}
 }
 
 #endif

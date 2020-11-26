@@ -90,7 +90,7 @@ static void clean_supplementary_groups(gid_t gid) {
 	int i = 0;
 	while (allowed[i]) {
 		gid_t g = get_group_id(allowed[i]);
-	 	if (g) {
+		if (g != -1) {
 			int j;
 			for (j = 0; j < ngroups; j++) {
 				if (g == groups[j]) {
@@ -146,9 +146,9 @@ void drop_privs(int nogroups) {
 		clean_supplementary_groups(gid);
 
 	// set uid/gid
-	if (setresgid(-1, getgid(), getgid()) != 0)
+	if (setresgid(euid_data.gid, euid_data.gid, euid_data.gid) == -1)
 		errExit("setresgid");
-	if (setresuid(-1, getuid(), getuid()) != 0)
+	if (setresuid(euid_data.uid, euid_data.uid, euid_data.uid) == -1)
 		errExit("setresuid");
 }
 
@@ -733,6 +733,9 @@ void update_map(char *mapping, char *map_file) {
 		if (mapping[j] == ',')
 			mapping[j] = '\n';
 
+	if (arg_debug)
+		fprintf(stderr, "write %s:\n%s\n", map_file, mapping);
+
 	fd = open(map_file, O_RDWR);
 	if (fd == -1) {
 		fprintf(stderr, "Error: cannot open %s: %s\n", map_file, strerror(errno));
@@ -858,14 +861,20 @@ uid_t pid_get_uid(pid_t pid) {
 
 
 
-uid_t get_group_id(const char *group) {
-	// find tty group id
-	gid_t gid = 0;
+gid_t get_group_id(const char *group) {
+	gid_t gid = INVALID_GID;
 	struct group *g = getgrnam(group);
 	if (g)
 		gid = g->gr_gid;
-
 	return gid;
+}
+
+uid_t get_user_id(const char *user) {
+	uid_t uid = INVALID_UID;
+	struct passwd *pw = getpwnam(user);
+	if (pw)
+		uid = pw->pw_uid;
+	return uid;
 }
 
 

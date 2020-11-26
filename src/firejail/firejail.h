@@ -156,6 +156,7 @@ typedef struct config_t {
 	char *home_private_keep;	// keep list for private home directory
 	char *etc_private_keep;	// keep list for private etc directory
 	char *opt_private_keep;	// keep list for private opt directory
+	char *privileged_data_keep;	// keep list for privileged data
 	char *srv_private_keep;	// keep list for private srv directory
 	char *bin_private_keep;	// keep list for private bin directory
 	char *bin_private_lib;	// executable list sent by private-bin to private-lib
@@ -449,6 +450,7 @@ int profile_check_line(char *ptr, int lineno, const char *fname);
 // add a profile entry in cfg.profile list; use str to populate the list
 void profile_add(char *str);
 void profile_add_ignore(const char *str);
+char *profile_list_slice(char *pos, char **ppos);
 char *profile_list_normalize(char *list);
 char *profile_list_compress(char *list);
 void profile_list_augment(char **list, const char *items);
@@ -517,7 +519,8 @@ void update_map(char *mapping, char *map_file);
 void wait_for_other(int fd);
 void notify_other(int fd);
 uid_t pid_get_uid(pid_t pid);
-uid_t get_group_id(const char *group);
+gid_t get_group_id(const char *group);
+uid_t get_user_id(const char *user);
 int remove_overlay_directory(void);
 void flush_stdin(void);
 int create_empty_dir_as_user(const char *dir, mode_t mode);

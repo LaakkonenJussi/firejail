@@ -1289,6 +1289,15 @@ int profile_check_line(char *ptr, int lineno, const char *fname) {
 		return 0;
 	}
 
+	// private /privileged list of files and directories
+	if (strncmp(ptr, "privileged-data ", 16) == 0) {
+		const char *arg = ptr + 16;
+		profile_list_augment(&cfg.privileged_data_keep, arg);
+		if (arg_debug)
+			fprintf(stderr, "[profile] combined privileged-data list: \"%s\"\n", cfg.privileged_data_keep);
+		return 0;
+	}
+
 	// private /srv list of files and directories
 	if (strncmp(ptr, "private-srv ", 12) == 0) {
 		if (cfg.srv_private_keep) {
@@ -1769,6 +1778,28 @@ void profile_read(const char *fname) {
 	}
 	fclose(fp);
 }
+
+char *profile_list_slice(char *pos, char **ppos)
+{
+	/* Extract token from comma separated list.
+	 *
+	 * Input must be valid c-string, always returns valid c-string.
+	 *
+	 * If input is a normalized list, returned string is non-empty
+	 * unless parse position is already at the end of the list.
+	 */
+	char *beg = pos;
+	for (; *pos; ++pos) {
+		if (*pos == ',') {
+			*pos++ = 0;
+			break;
+		}
+	}
+	if (ppos)
+		*ppos = pos;
+	return beg;
+}
+
 
 char *profile_list_normalize(char *list)
 {
