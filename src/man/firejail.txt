@@ -2504,6 +2504,23 @@ $ firejail \-\-list
 .br
 $ firejail \-\-shutdown=3272
 .TP
+\fB\-\-template=KEY:VALUE
+Define a template \fBKEY\fR with \fBVALUE\fR to have application specific \fB${KEY}\fRs in the profile files replaced with the given value. This is useful, for example, with D-Bus name ownership to make a generic ownership rule to be application specific. See \fB\&\flfirejail-profile\fR\|(5)\fR for information on how to use the template keys in profile files. Internal macros cannot be overridden with this, in such case firejail quits with an error message.
+.br
+
+.br
+Keys must start with an alphabetic character (A-Za-z) and can contain alphanumeric characters. Values can have alphanumeric and '._/' characters, and they must be under the D-Bus name length limit (255 chars). A value cannot contain consequtive dots ('..').
+.br
+
+.br
+Example:
+.br
+$ firejail \-\-template=AppName:MyAppName
+.br
+
+.br
+Will change profile file line "dbus\-user\.own org\.name\.Client\.${AppName}" -> "dbus\-user\.own org\.name\.Client\.MyAppName".
+.TP
 \fB\-\-timeout=hh:mm:ss
 Kill the sandbox automatically after the time has elapsed. The time is specified in hours/minutes/seconds format.
 .br

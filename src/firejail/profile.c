@@ -1773,6 +1773,40 @@ void profile_read(const char *fname) {
 			msg_printed = 1;
 		}
 
+		// Replace all template keys on line if at least one non-
+		// hardcoded or not internally used is found. Since templates
+		// can be used anywhere process the keys before include.
+		char *ptr_expanded;
+
+		switch (template_requires_expansion(ptr)) {
+		case -EINVAL:
+			fprintf(stderr, "Ignoring line \"%s\", as it "
+					"contains invalid template keys\n",
+					ptr);
+			free(ptr);
+			continue;
+		case 0:
+			break;
+		case 1:
+			ptr_expanded = template_replace_keys(ptr);
+			if (ptr_expanded == NULL) {
+				fprintf(stderr, "Ignoring line \"%s\"\n", ptr);
+				free(ptr);
+				continue;
+			}
+
+			if (arg_debug)
+				printf("template keys expanded: \"%s\"\n",
+								ptr_expanded);
+
+			free(ptr);
+			ptr = ptr_expanded;
+
+			break;
+		default:
+			break;
+		}
+
 		// process include
 		if (strncmp(ptr, "include ", 8) == 0 && !is_in_ignore_list(ptr)) {
 			include_level++;

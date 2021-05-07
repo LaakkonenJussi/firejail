@@ -863,6 +863,8 @@ void set_x11_run_file(pid_t pid, int display);
 void set_profile_run_file(pid_t pid, const char *fname);
 
 // dbus.c
+#define DBUS_MAX_NAME_LENGTH 255
+
 int dbus_check_name(const char *name);
 int dbus_check_call_rule(const char *name);
 void dbus_check_profile(void);
@@ -881,4 +883,10 @@ void dhcp_start(void);
 // selinux.c
 void selinux_relabel_path(const char *path, const char *inside_path);
 
+// template.c
+void check_template(char *arg);
+int template_requires_expansion(char *arg);
+char *template_replace_keys(char *arg);
+void template_print_all();
+void template_cleanup();
 #endif
