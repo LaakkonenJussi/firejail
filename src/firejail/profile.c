@@ -26,6 +26,18 @@ extern char *xephyr_screen;
 
 #define MAX_READ 8192				  // line buffer for profile files
 
+typedef struct profile_file_name_t {
+	char *fname;
+	struct profile_file_name_t *next;
+} ProfileFileName;
+
+// This is initially set to make profile_read() to add the profile filename
+// to a list of profiles that are to be read after arguments have been
+// processed and templates are set in order to replace any template key
+// existing in the profile lines.
+static int read_profiles = 0;
+static ProfileFileName *profile_file_name_list = NULL;
+
 // find and read the profile specified by name from dir directory
 // return  1 if a profile was found
 static int profile_find(const char *name, const char *dir, int add_ext) {
@@ -1643,6 +1655,27 @@ void profile_add(char *str) {
 	ptr->next = prf;
 }
 
+// Prepends entries to profile_file_name_list for later reading of the files
+// List is reversed when the file list is processed to provide correct order
+void add_to_profile_file_name_list(const char *fname)
+{
+	ProfileFileName *pfn;
+
+	if (!fname || !*fname)
+		return;
+
+	//if (arg_debug)
+		printf("Add profile \"%s\" to list\n", fname);
+
+	pfn = malloc(sizeof(ProfileFileName));
+	if (!pfn)
+		errExit("malloc");
+
+	pfn->fname = strdup(fname);
+	pfn->next = profile_file_name_list;
+	profile_file_name_list = pfn;
+}
+
 // read a profile file
 static int include_level = 0;
 void profile_read(const char *fname) {
@@ -1689,6 +1722,11 @@ void profile_read(const char *fname) {
 			if (strcmp(tmp, "disable-shell.inc") == 0)
 				return;
 		}
+	}
+
+	if (!read_profiles) {
+		add_to_profile_file_name_list(fname);
+		return;
 	}
 
 	// open profile file:
@@ -1777,6 +1815,49 @@ void profile_read(const char *fname) {
 #endif
 	}
 	fclose(fp);
+}
+
+static ProfileFileName *reverse_read_file_list(ProfileFileName *head)
+{
+	ProfileFileName *curr = head;
+	ProfileFileName *prev = NULL;
+	ProfileFileName *next = NULL;
+
+	while (curr) {
+		next = curr->next;
+		curr->next = prev;
+		prev = curr;
+		curr = next;
+	}
+
+	return prev;
+}
+
+void profile_read_file_list()
+{
+	ProfileFileName *iter;
+	ProfileFileName *temp;
+
+	read_profiles = 1;
+
+	// Profile files are prepended to the list, reverse the list to
+	// read profile files in given order. Get the beginning of the
+	// reverse list and free each element as they are processed.
+	iter = reverse_read_file_list(profile_file_name_list);
+	while (iter) {
+		if (arg_debug)
+			printf("Read profile \"%s\"\n", iter->fname);
+
+		profile_read(iter->fname);
+
+		temp = iter;
+		iter = iter->next;
+
+		free(temp->fname);
+		free(temp);
+	}
+
+	profile_file_name_list = NULL;
 }
 
 char *profile_list_slice(char *pos, char **ppos)

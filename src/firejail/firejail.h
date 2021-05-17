@@ -454,6 +454,7 @@ char *profile_list_slice(char *pos, char **ppos);
 char *profile_list_normalize(char *list);
 char *profile_list_compress(char *list);
 void profile_list_augment(char **list, const char *items);
+void profile_read_file_list();
 
 // list.c
 void list(void);

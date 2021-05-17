@@ -2732,6 +2732,9 @@ int main(int argc, char **argv, char **envp) {
 			break;
 		}
 	}
+
+	profile_read_file_list();
+
 	EUID_ASSERT();
 
 	// exit chroot, overlay and appimage sandboxes when caps are explicitly specified on command line
