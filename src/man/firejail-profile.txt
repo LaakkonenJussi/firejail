@@ -881,6 +881,20 @@ Always exit firejail with the first child's exit status. The default behavior is
 Join the sandbox identified by name or start a new one.
 Same as "firejail --join=sandboxname" command if sandbox with specified name exists, otherwise same as "name sandboxname".
 
+.SH Template keys
+.TP
+Profile files can have custom template keys defined with similar to macro format: \fB${KEY}\fR. These keys can be used anywhere in the profile but not at the beginning of the line.
+.TP
+If a key on the profile line is not defined with \fB\-\-template=KEY:VALUE\fR then the complete line will be ignored. Multiple keys can be defined on a single line. Template key usage does not interfere with macros, since macros cannot be overridden. A key must start with an alphanumeric character and can contain digits. See \fB\&\flfirejail\fR\|(1)\fR for more information on how to define the values with \fB\-\-template\fR.
+.br
+
+.br
+Example: dbus-user.own org.name.Client.${AppName}
+.br
+Example: whitelist ${HOME}/.config/${OrgName}/applications/${AppName}/
+.br
+Example: include /usr/local/etc/${ProfilePath}/${Name1}/${Name2}.${CustomSuffix}
+
 .SH FILES
 /etc/firejail/filename.profile, $HOME/.config/firejail/filename.profile
 

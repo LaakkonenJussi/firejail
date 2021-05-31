@@ -2598,6 +2598,11 @@ int main(int argc, char **argv, char **envp) {
 				exit_err_feature("networking");
 		}
 #endif
+		else if (strncmp(argv[i], "--template=", 11) == 0) {
+			char *arg = strdup(argv[i] + 11); // Parse key in check_template()
+			check_template(arg);
+			free(arg);
+		}
 		//*************************************
 		// command
 		//*************************************
@@ -2732,6 +2737,12 @@ int main(int argc, char **argv, char **envp) {
 			break;
 		}
 	}
+
+	// Prints templates only if arg_debug is set
+	template_print_all();
+
+	profile_read_file_list();
+
 	EUID_ASSERT();
 
 	// exit chroot, overlay and appimage sandboxes when caps are explicitly specified on command line
@@ -2848,6 +2859,9 @@ int main(int argc, char **argv, char **envp) {
 			fmessage("\n** Note: you can use --noprofile to disable %s.profile **\n\n", profile_name);
 	}
 	EUID_ASSERT();
+
+	// Templates are no longer needed as profile files are read
+	template_cleanup();
 
 	// block X11 sockets
 	if (arg_x11_block)

@@ -230,6 +230,7 @@ static char *usage_str =
 	"    --shell=none - run the program directly without a user shell.\n"
 	"    --shell=program - set default user shell.\n"
 	"    --shutdown=name|pid - shutdown the sandbox identified by name or PID.\n"
+	"    --template=KEY:VALUE - set a template KEY with VALUE usable as ${KEY} in profiles\n"
 	"    --timeout=hh:mm:ss - kill the sandbox automatically after the time\n"
 	"\thas elapsed.\n"
 	"    --tmpfs=dirname - mount a tmpfs filesystem on directory dirname.\n"

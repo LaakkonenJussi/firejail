@@ -41,7 +41,7 @@
 #define DBUS_USER_DIR_FORMAT RUN_FIREJAIL_DBUS_DIR "/%d"
 #define DBUS_USER_PROXY_SOCKET_FORMAT DBUS_USER_DIR_FORMAT "/%d-user"
 #define DBUS_SYSTEM_PROXY_SOCKET_FORMAT DBUS_USER_DIR_FORMAT "/%d-system"
-#define DBUS_MAX_NAME_LENGTH 255
+// moved to firejail.h - #define DBUS_MAX_NAME_LENGTH 255
 // moved to include/common.h - #define XDG_DBUS_PROXY_PATH "/usr/bin/xdg-dbus-proxy"
 
 static pid_t dbus_proxy_pid = 0;
